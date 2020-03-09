@@ -9,7 +9,10 @@ import re
 import numpy
 
 top = tk.Tk()
-top.dir = tk.filedialog.askdirectory(initialdir="/", title="Select Directory",)
+dirButtons = tk.Frame(top)
+top.title("TTStoPnp")
+text = tk.Text(top)
+
 
 # Code to add widgets will go here...
 
@@ -39,18 +42,19 @@ def separateImage(image, directory, filename):
     cardRow = 0
     count = 0
     imgData = numpy.asarray(image)
-    page = numpy.ones((cardHeight * 3, cardWidth * 3, 3)) * 255
+    page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, 3)) * 255
     for i in range(7):
         for j in range(10):
             card = imgData[
-                i * cardHeight : (i + 1) * cardHeight - 1,
-                j * cardWidth : (j + 1) * cardWidth - 1,
+                i * cardHeight : (i + 1) * cardHeight,
+                j * cardWidth : (j + 1) * cardWidth,
                 :,
             ]
             if card.sum() > 0:
                 page[
-                    cardRow * cardHeight : (cardRow + 1) * cardHeight - 1,
-                    cardCol * cardWidth : (cardCol + 1) * cardWidth - 1,
+                    cardRow * (cardHeight + 1) : cardRow * (cardHeight + 1)
+                    + cardHeight,
+                    cardCol * (cardWidth + 1) : cardCol * (cardWidth + 1) + cardWidth,
                     :,
                 ] = card
                 cardCol, cardRow = nextCardLocation(cardCol, cardRow)
@@ -62,7 +66,7 @@ def separateImage(image, directory, filename):
                     os.path.join(directory, "sep" + str(count) + "-" + filename)
                 )
                 count += 1
-                page = numpy.ones((cardHeight * 3, cardWidth * 3, 3)) * 255
+                page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, 3)) * 255
     return count
 
 
@@ -82,12 +86,36 @@ def buttonPress():
         image = Image.open(imagePath)
         if checkSize(image):
             num += separateImage(image, top.dir, filename)
-    tk.messagebox.showinfo(
-        "Done", "Separated " + str(num) + " Files, created pages: " + str(imageList)
-    )
+    tk.messagebox.showinfo("Done", "Separated " + str(num) + " images")
 
 
-b1 = tk.Button(top, text="Separate Images", command=buttonPress)
+def selectDir(top):
+    top.dir = tk.filedialog.askdirectory(initialdir="/", title="Select Directory",)
+    text.delete(1.0, tk.END)
+    text.insert(tk.INSERT, "dir: " + top.dir)
+    text.insert(tk.INSERT, "\nImages to Separate: ")
+    for image in getImages(top.dir):
+        text.insert(tk.INSERT, "\n" + image)
+    text.pack()
 
-b1.pack()
+
+def useCurDir(top):
+    top.dir = os.getcwd()
+    text.delete(1.0, tk.END)
+    text.insert(tk.INSERT, "dir: " + top.dir)
+    text.insert(tk.INSERT, "\nImages to Separate: ")
+    for image in getImages(top.dir):
+        text.insert(tk.INSERT, "\n" + image)
+    text.pack()
+
+
+sep = tk.Button(top, text="Separate Images", command=buttonPress)
+select = tk.Button(top, text="Select Directory", command=lambda: selectDir(top))
+useCur = tk.Button(top, text="Use Current Directory", command=useCurDir(top))
+
+dirButtons.pack()
+select.pack(in_=dirButtons, side=tk.LEFT)
+useCur.pack(in_=dirButtons, side=tk.RIGHT)
+sep.pack()
+
 top.mainloop()
