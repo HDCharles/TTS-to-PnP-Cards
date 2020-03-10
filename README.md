@@ -7,7 +7,7 @@ To run:
 
 1) Open a command prompt (cmd.exe)
 
-2) Navigate to the directory with the python file (type: cd <path to folder with TTStoPnp.py>)
+2) Navigate to the directory with the python file (type: cd \<path to folder with TTStoPnp.py\>)
  
 3) Type: python TTStoPnp.py
 
