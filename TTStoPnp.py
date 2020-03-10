@@ -74,7 +74,10 @@ def getImages(directory):
     imageList = []
     for filename in os.listdir(directory):
         if re.search(".*\.png", filename) or re.search(".*\.jpeg", filename):
-            imageList.append(filename)
+            imagePath = os.path.join(directory, filename)
+            image = Image.open(imagePath)
+            if checkSize(image):
+                imageList.append(filename)
     return imageList
 
 
@@ -84,9 +87,8 @@ def buttonPress():
     for filename in imageList:
         imagePath = os.path.join(top.dir, filename)
         image = Image.open(imagePath)
-        if checkSize(image):
-            num += separateImage(image, top.dir, filename)
-    tk.messagebox.showinfo("Done", "Separated " + str(num) + " images")
+        num += separateImage(image, top.dir, filename)
+    tk.messagebox.showinfo("Done", "Create " + str(num) + " Images")
 
 
 def selectDir(top):
