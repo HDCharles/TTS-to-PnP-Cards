@@ -71,8 +71,6 @@ def separateImage(image, directory, filename, rows, cols):
 
     cardHeight = int(imageHeight / rows)
     cardWidth = int(imageWidth / cols)
-    print(rows)
-    print(cols)
 
     cardCol = 0
     cardRow = 0
@@ -81,11 +79,13 @@ def separateImage(image, directory, filename, rows, cols):
     page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, 3)) * 255
     for i in range(rows):
         for j in range(cols):
+
             card = imgData[
                 i * cardHeight : (i + 1) * cardHeight,
                 j * cardWidth : (j + 1) * cardWidth,
                 :,
             ]
+            print(i, j, card.sum())
             if card.sum() > 0:
                 page[
                     cardRow * (cardHeight + 1) : cardRow * (cardHeight + 1)
@@ -95,7 +95,7 @@ def separateImage(image, directory, filename, rows, cols):
                 ] = card
                 cardCol, cardRow = nextCardLocation(cardCol, cardRow)
             if (cardCol == 0 and cardRow == 0) or (
-                i == rows - 1 and cols == 10 - 1
+                i == rows - 1 and j == cols - 1
             ):  # if filled up image or about to exit
                 imagePage = Image.fromarray(page.astype(numpy.uint8))
                 imagePage.save(
