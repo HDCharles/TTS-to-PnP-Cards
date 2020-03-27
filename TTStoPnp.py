@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+# make exe with: pyinstaller --onefile --icon=TTStoPnp.ico TTStoPnp.py
+
 from tkinter import filedialog
 import tkinter as tk
 from tkinter import messagebox
@@ -85,7 +87,6 @@ def separateImage(image, directory, filename, rows, cols):
                 j * cardWidth : (j + 1) * cardWidth,
                 :,
             ]
-            print(i, j, card.sum())
             if card.sum() > 0:
                 page[
                     cardRow * (cardHeight + 1) : cardRow * (cardHeight + 1)
