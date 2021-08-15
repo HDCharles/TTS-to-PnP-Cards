@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# make exe with: pyinstaller --onefile --icon=TTStoPnp.ico TTStoPnp.py
+# make exe with: pyinstaller --onefile --noupx --icon=TTStoPnp.png TTStoPnp.py
 
 from tkinter import filedialog
 import tkinter as tk
@@ -26,17 +26,20 @@ def useCurDir():
 
 
 def selectDir():
-    top.dir = tk.filedialog.askdirectory(initialdir="/", title="Select Directory",)
+    top.dir = tk.filedialog.askdirectory(
+        initialdir="/",
+        title="Select Directory (files not shown)",
+    )
     # setupText()
     setupSelector()
 
 
-def setupText():
-    text.delete(1.0, tk.END)
-    text.insert(tk.INSERT, "dir: " + top.dir)
-    text.pack()
+# def setupText():
+#     text.delete(1.0, tk.END)
+#     text.insert(tk.INSERT, "dir: " + top.dir)
+#     text.pack()
 
-    # setupSelector()
+# setupSelector()
 
 
 def getImages():
@@ -77,8 +80,12 @@ def separateImage(image, directory, filename, rows, cols):
     cardCol = 0
     cardRow = 0
     count = 0
+
     imgData = numpy.asarray(image)
-    page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, 3)) * 255
+    imageChannels = imgData.shape[2]
+
+    page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, imageChannels)) * 255
+
     for i in range(rows):
         for j in range(cols):
 
@@ -87,7 +94,7 @@ def separateImage(image, directory, filename, rows, cols):
                 j * cardWidth : (j + 1) * cardWidth,
                 :,
             ]
-            if card.sum() > 0:
+            if card[:, :, :3].sum() > 0:
                 page[
                     cardRow * (cardHeight + 1) : cardRow * (cardHeight + 1)
                     + cardHeight,
@@ -103,7 +110,10 @@ def separateImage(image, directory, filename, rows, cols):
                     os.path.join(directory, "sep" + str(count) + "-" + filename)
                 )
                 count += 1
-                page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, 3)) * 255
+                page = (
+                    numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, imageChannels))
+                    * 255
+                )
     return count
 
 
@@ -155,7 +165,7 @@ helpButton = tk.Button(
     text="Help",
     command=lambda: tk.messagebox.showinfo(
         "Instructions",
-        "1) Select your desired directory\n2) Input each image's card dimensions\n3) Leave 0,0 for images you wish to ignore \nNote: images with names that start with 'sep' are ignored",
+        "1) Select your desired directory\n2) Input each image's card dimensions (usually 7, 10 for TTS)\n3) Leave 0,0 for images you wish to ignore\n4) Separate Images\nNote: images with names that start with 'sep' are ignored",
     ),
 )
 sep.pack(in_=comButtons, side=tk.LEFT)
