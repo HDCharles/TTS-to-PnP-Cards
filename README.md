@@ -7,8 +7,9 @@ Standalone exe available here: https://github.com/HDCharles/TTS-to-PnP-Cards/rel
 
 Its 200MB though I recommend just running the [TTStoPnp.py](TTStoPnp.py) file directly since 
 
+- the exe is 200MB which is insane
 - you shouldn't run random exe files from the internet unless there's more than 11 people starring the repo
-- you sholdn't run random .py files from the internet unless there's more than 11 people starring the repo
+- you sholdn't run random .py files from the internet unless there's more than 11 people starring the repo...
 - but you can ~copy paste the code into the LLM of your choice~ read the code to see if its doing something nefarious.
 
 ## Usage
