@@ -1,14 +1,13 @@
-#!/usr/bin/python
 
-# make exe with: pyinstaller --onefile --noupx --icon=TTStoPnp.png TTStoPnp.py
+# make exe
+# nuitka --onefile --enable-plugin=tk-inter --windows-icon-from-ico=TTStoPnp.ico --windows-console-mode=disable --lto=yes --remove-output TTStoPnp.py
 
 from tkinter import filedialog
 import tkinter as tk
 from tkinter import messagebox
-from PIL import Image
+from PIL import Image, ImageTk
 import os
 import re
-import numpy
 
 top = tk.Tk()
 top.title("TTStoPnp")
@@ -34,7 +33,7 @@ def getImages():
     imageList = []
     for filename in sorted(os.listdir(directory)):
         if (
-            re.search(r".*\.png", filename, re.IGNORECASE) 
+            re.search(r".*\.png", filename, re.IGNORECASE)
             or re.search(r".*\.jpe?g", filename, re.IGNORECASE)
         ) and not re.search(r"^sep.*", filename):
             imagePath = os.path.join(directory, filename)
@@ -45,6 +44,15 @@ def getImages():
             except Exception:
                 pass
     top.imageList = imageList
+
+
+def is_blank_card(card):
+    """Check if a card is blank (all pixels are zero or nearly zero)"""
+    # Get bounding box of non-zero content; returns None if image is empty/blank
+    # Convert to RGB first to ignore alpha channel
+    rgb = card.convert("RGB")
+    bbox = rgb.getbbox()
+    return bbox is None
 
 
 def separateImage(image, directory, filename, rows, cols):
@@ -66,43 +74,67 @@ def separateImage(image, directory, filename, rows, cols):
     cardRow = 0
     count = 0
 
-    imgData = numpy.asarray(image)
-    imageChannels = imgData.shape[2]
+    # Determine if output is JPEG (doesn't support alpha)
+    lower_filename = filename.lower()
+    is_jpeg = lower_filename.endswith(".jpg") or lower_filename.endswith(".jpeg")
 
-    page = numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, imageChannels)) * 255
+    # Create a new blank page (white background)
+    # Use RGB for JPEG output, otherwise match input mode
+    if is_jpeg:
+        mode = "RGB"
+    else:
+        mode = image.mode if image.mode in ("RGB", "RGBA") else "RGB"
+    
+    pageWidth = cardWidth * 3 + 2
+    pageHeight = cardHeight * 3 + 2
+    
+    if mode == "RGBA":
+        page = Image.new(mode, (pageWidth, pageHeight), (255, 255, 255, 255))
+    else:
+        page = Image.new(mode, (pageWidth, pageHeight), (255, 255, 255))
+
+    # Convert source image to matching mode for pasting
+    if is_jpeg and image.mode == "RGBA":
+        # Composite RGBA onto white background to convert properly
+        image = image.convert("RGB")
 
     for i in range(rows):
         for j in range(cols):
-            card = imgData[
-                i * cardHeight : (i + 1) * cardHeight,
-                j * cardWidth : (j + 1) * cardWidth,
-                :,
-            ]
-            if card[:, :, :3].sum() > 0:
-                page[
-                    cardRow * (cardHeight + 1) : cardRow * (cardHeight + 1) + cardHeight,
-                    cardCol * (cardWidth + 1) : cardCol * (cardWidth + 1) + cardWidth,
-                    :,
-                ] = card
+            # Crop the card from the source image
+            left = j * cardWidth
+            upper = i * cardHeight
+            right = (j + 1) * cardWidth
+            lower = (i + 1) * cardHeight
+            card = image.crop((left, upper, right, lower))
+
+            # Check if card has content (not blank)
+            if not is_blank_card(card):
+                # Calculate paste position
+                paste_x = cardCol * (cardWidth + 1)
+                paste_y = cardRow * (cardHeight + 1)
+                page.paste(card, (paste_x, paste_y))
                 cardCol, cardRow = nextCardLocation(cardCol, cardRow)
-            if (cardCol == 0 and cardRow == 0) or (
-                i == rows - 1 and j == cols - 1
-            ):
-                imagePage = Image.fromarray(page.astype(numpy.uint8))
-                imagePage.save(
+
+            # If filled up page or about to exit, save the page
+            if (cardCol == 0 and cardRow == 0) or (i == rows - 1 and j == cols - 1):
+                page.save(
                     os.path.join(directory, "sep" + str(count) + "-" + filename)
                 )
                 count += 1
-                page = (
-                    numpy.ones((cardHeight * 3 + 2, cardWidth * 3 + 2, imageChannels))
-                    * 255
-                )
+                # Create fresh page
+                if mode == "RGBA":
+                    page = Image.new(mode, (pageWidth, pageHeight), (255, 255, 255, 255))
+                else:
+                    page = Image.new(mode, (pageWidth, pageHeight), (255, 255, 255))
+
     return count
 
 
 def separate():
     imageList = top.imageList
     num = 0
+    failed_files = []
+    
     for i, filename in enumerate(imageList):
         try:
             cols = int(top.dimCol[i].get())
@@ -111,10 +143,25 @@ def separate():
             continue
         if cols > 0 and rows > 0:
             imagePath = os.path.join(top.dir, filename)
-            image = Image.open(imagePath)
-            num += separateImage(image, top.dir, filename, rows, cols)
-            image.close()
-    tk.messagebox.showinfo("Done", "Created " + str(num) + " Images")
+            try:
+                image = Image.open(imagePath)
+                num += separateImage(image, top.dir, filename, rows, cols)
+                image.close()
+            except Exception as e:
+                failed_files.append(f"{filename}: {str(e)}")
+    
+    # Show results
+    if failed_files:
+        error_msg = "The following files could not be processed:\n\n" + "\n".join(failed_files)
+        if num > 0:
+            tk.messagebox.showwarning(
+                "Completed with Errors",
+                f"Created {num} images.\n\n{error_msg}"
+            )
+        else:
+            tk.messagebox.showerror("Error", error_msg)
+    else:
+        tk.messagebox.showinfo("Done", "Created " + str(num) + " Images")
 
 
 def applyToAll():
@@ -124,7 +171,7 @@ def applyToAll():
         defaultCols = top.defaultCols.get()
     except Exception:
         return
-    
+
     for i in range(len(top.imageList)):
         top.dimRow[i].delete(0, tk.END)
         top.dimRow[i].insert(0, defaultRows)
@@ -154,29 +201,50 @@ def setupSelector():
     getImages()
     dimCol = []
     dimRow = []
+    top.thumbnails = []  # Keep references to prevent garbage collection
+
+    show_thumbs = top.showThumbnails.get()
 
     # Header row
+    col_offset = 1 if show_thumbs else 0
+    if show_thumbs:
+        tk.Label(top.scrollFrame, text="", width=6).grid(row=0, column=0)  # Thumbnail column
     tk.Label(top.scrollFrame, text="Image", font=("TkDefaultFont", 9, "bold")).grid(
-        row=0, column=0, sticky="w", padx=5
+        row=0, column=col_offset, sticky="w", padx=5
     )
     tk.Label(top.scrollFrame, text="Rows", font=("TkDefaultFont", 9, "bold")).grid(
-        row=0, column=1, padx=5
+        row=0, column=col_offset + 1, padx=5
     )
     tk.Label(top.scrollFrame, text="Cols", font=("TkDefaultFont", 9, "bold")).grid(
-        row=0, column=2, padx=5
+        row=0, column=col_offset + 2, padx=5
     )
 
     for i, imageName in enumerate(top.imageList):
+        # Create thumbnail if enabled
+        if show_thumbs:
+            try:
+                imagePath = os.path.join(top.dir, imageName)
+                img = Image.open(imagePath)
+                img.thumbnail((50, 50))  # Resize to max 50x50
+                photo = ImageTk.PhotoImage(img)
+                top.thumbnails.append(photo)  # Keep reference
+                thumb_label = tk.Label(top.scrollFrame, image=photo)
+                thumb_label.grid(row=i + 1, column=0, padx=2, pady=2)
+                img.close()
+            except Exception:
+                # If thumbnail fails, just show empty space
+                tk.Label(top.scrollFrame, text="", width=6).grid(row=i + 1, column=0)
+
         # Truncate long filenames for display
         displayName = imageName if len(imageName) <= 40 else imageName[:37] + "..."
         tk.Label(top.scrollFrame, text=displayName).grid(
-            row=i + 1, column=0, sticky="w", padx=5
+            row=i + 1, column=col_offset, sticky="w", padx=5
         )
-        
+
         dimRow.append(tk.Entry(top.scrollFrame, width=5))
         dimCol.append(tk.Entry(top.scrollFrame, width=5))
-        dimRow[i].grid(row=i + 1, column=1, padx=5, pady=1)
-        dimCol[i].grid(row=i + 1, column=2, padx=5, pady=1)
+        dimRow[i].grid(row=i + 1, column=col_offset + 1, padx=5, pady=1)
+        dimCol[i].grid(row=i + 1, column=col_offset + 2, padx=5, pady=1)
         dimRow[i].insert(0, "0")
         dimCol[i].insert(0, "0")
 
@@ -210,6 +278,23 @@ useCur = tk.Button(dirButtons, text="Use Current Directory", command=useCurDir)
 select.pack(side=tk.LEFT, padx=5)
 useCur.pack(side=tk.LEFT, padx=5)
 dirButtons.pack(pady=5)
+
+# Thumbnail toggle
+top.showThumbnails = tk.BooleanVar(value=False)
+
+def toggleThumbnails():
+    if hasattr(top, 'dir') and top.dir:
+        setupSelector()
+
+thumbFrame = tk.Frame(top)
+thumbCheck = tk.Checkbutton(
+    thumbFrame, 
+    text="Show thumbnails", 
+    variable=top.showThumbnails,
+    command=toggleThumbnails
+)
+thumbCheck.pack()
+thumbFrame.pack(pady=2)
 
 # Bulk operations frame
 bulkFrame = tk.Frame(top)
